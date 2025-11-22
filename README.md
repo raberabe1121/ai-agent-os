@@ -77,13 +77,13 @@ Postfix から受け取ったメールを構造化メッセージ（Envelope）�
 }
 ```
 ### 3. Workers
-メッセージルーティング
-ActivityPub 変換
-AI 自動応答
-Notion 等の SaaS 更新
+- メッセージルーティング
+- ActivityPub 変換
+- AI 自動応答
+- Notion 等の SaaS 更新
 
 ### 4. Web UI
-受信メッセージ閲覧
-AI エージェントの状態可視化
-ActivityPub / メール的フロント
+- 受信メッセージ閲覧
+- AI エージェントの状態可視化
+- ActivityPub / メール的フロント
 
