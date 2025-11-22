@@ -75,7 +75,7 @@ Postfix から受け取ったメールを構造化メッセージ（Envelope）�
   "payload": { ... },
   "time": "ISO8601"
 }
-
+```
 ### 3. Workers
 メッセージルーティング
 ActivityPub 変換
