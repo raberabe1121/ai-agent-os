@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from ai_agent_hub import Envelope
 from ai_agent_hub.lmtp_handler import QUEUE_DIR
+from ai_agent_hub.smtp_sender import send_envelope_via_smtp
 
 PROCESSED_DIR = Path("./processed")
 WORKER_AGENT_ID = "https://agent.local/@worker"
@@ -85,13 +86,6 @@ def _handle_envelope(env: Envelope) -> Optional[Envelope]:
         return None
 
     return _build_reply(env, reply_payload)
-
-
-def send_envelope_via_smtp(env: Envelope) -> None:
-    """Placeholder SMTP sender to be implemented later."""
-
-    print("Sending envelope via SMTP:")
-    print(env.to_json(indent=2))
 
 
 def process_next_envelope() -> bool:
