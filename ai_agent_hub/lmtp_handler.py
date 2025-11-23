@@ -1,14 +1,24 @@
+"""LMTP handler that converts incoming email into envelopes."""
+
+import importlib.util
 import os
 import re
 import time
 from datetime import datetime, timezone
 from email import message_from_bytes
-
-from aiosmtpd.controller import Controller
+from pathlib import Path
 
 from ai_agent_hub import Envelope
 
-QUEUE_DIR = "./queue"
+_AIOSMTPD_AVAILABLE = importlib.util.find_spec("aiosmtpd") is not None
+if _AIOSMTPD_AVAILABLE:
+    from aiosmtpd.controller import Controller
+    from aiosmtpd.smtp import LMTP
+else:  # pragma: no cover - exercised only when dependency is missing
+    Controller = None  # type: ignore[assignment]
+    LMTP = None  # type: ignore[assignment]
+
+QUEUE_DIR = Path(os.environ.get("AI_AGENT_HUB_QUEUE_DIR", "./queue"))
 
 
 class LMTPHandler:
@@ -37,15 +47,25 @@ class LMTPHandler:
 
 
 def extract_sender(msg):
-    header = msg.get("From")
-    match = re.search(r"https?://[^> ]+", header or "")
-    return match.group(0) if match else "https://unknown/@unknown"
+    return _extract_agent_id(msg.get("From"))
 
 
 def extract_recipient(msg):
-    header = msg.get("To")
-    match = re.search(r"https?://[^> ]+", header or "")
-    return match.group(0) if match else "https://unknown/@unknown"
+    return _extract_agent_id(msg.get("To"))
+
+
+def _extract_agent_id(raw_header: str | None) -> str:
+    """Extract an ActivityPub-style agent ID from an email header."""
+
+    if not raw_header:
+        return "https://unknown/@unknown"
+
+    cleaned = re.sub(r"\s+", "", raw_header)
+    match = re.search(r"https?://[^<>;]+/@[^<>;]+", cleaned)
+    if match:
+        return match.group(0).rstrip(";")
+
+    return "https://unknown/@unknown"
 
 
 def extract_body(msg):
@@ -59,15 +79,25 @@ def extract_body(msg):
 
 
 def save_envelope(env: Envelope):
-    os.makedirs(QUEUE_DIR, exist_ok=True)
-    fname = f"{env.created_at.timestamp()}-{env.id}.json"
-    fpath = os.path.join(QUEUE_DIR, fname)
-    with open(fpath, "w", encoding="utf-8") as f:
+    QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = env.created_at.isoformat().replace(":", "-")
+    fname = f"{timestamp}-{env.id}.json"
+    fpath = QUEUE_DIR / fname
+    with fpath.open("w", encoding="utf-8") as f:
         f.write(env.to_json(indent=2))
     print(f"Saved envelope → {fpath}")
 
 
+def _require_aiosmtpd() -> None:
+    if not _AIOSMTPD_AVAILABLE:
+        raise RuntimeError(
+            "aiosmtpd is required to run the LMTP server. Install with 'pip install aiosmtpd'."
+        )
+
+
 def main():
+    _require_aiosmtpd()
+
     controller = Controller(
         LMTPHandler(),
         hostname="127.0.0.1",
@@ -75,6 +105,7 @@ def main():
         decode_data=False,
         enable_SMTPUTF8=True,
         require_starttls=False,
+        server_cls=LMTP,
     )
     controller.start()
     print("AI Agent Hub LMTP Handler running at lmtp://127.0.0.1:8024")
