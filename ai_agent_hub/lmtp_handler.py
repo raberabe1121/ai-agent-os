@@ -72,7 +72,7 @@ def _extract_agent_id(raw_header: str | None) -> str:
     )
     match = _AGENT_ID_PATTERN.search(sanitized)
     if match:
-        return match.group(1)
+        return match.group(1).rstrip("/")
 
     return "https://unknown/@unknown"
 
