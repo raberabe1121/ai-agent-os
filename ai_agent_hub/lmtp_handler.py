@@ -1,6 +1,5 @@
 """LMTP handler that converts incoming email into envelopes."""
 
-import importlib.util
 import os
 import re
 import time
@@ -10,15 +9,20 @@ from pathlib import Path
 
 from ai_agent_hub import Envelope
 
-_AIOSMTPD_AVAILABLE = importlib.util.find_spec("aiosmtpd") is not None
-if _AIOSMTPD_AVAILABLE:
+try:  # pragma: no cover - import guard only
     from aiosmtpd.controller import Controller
     from aiosmtpd.smtp import LMTP
-else:  # pragma: no cover - exercised only when dependency is missing
+
+    HAS_AIOSMTPD = True
+except Exception:  # pragma: no cover - exercised when dependency missing
     Controller = None  # type: ignore[assignment]
     LMTP = None  # type: ignore[assignment]
+    HAS_AIOSMTPD = False
 
 QUEUE_DIR = Path(os.environ.get("AI_AGENT_HUB_QUEUE_DIR", "./queue"))
+
+
+_AGENT_ID_PATTERN = re.compile(r"(https?://[a-zA-Z0-9.\-]+/@[a-zA-Z0-9_.\-]+)")
 
 
 class LMTPHandler:
@@ -60,10 +64,15 @@ def _extract_agent_id(raw_header: str | None) -> str:
     if not raw_header:
         return "https://unknown/@unknown"
 
-    cleaned = re.sub(r"\s+", "", raw_header)
-    match = re.search(r"https?://[^<>;]+/@[^<>;]+", cleaned)
+    sanitized = re.sub(r"[<>]", " ", raw_header)
+    sanitized = re.sub(
+        r"https?\s*:\s*//",
+        lambda m: m.group(0).replace(" ", ""),
+        sanitized,
+    )
+    match = _AGENT_ID_PATTERN.search(sanitized)
     if match:
-        return match.group(0).rstrip(";")
+        return match.group(1)
 
     return "https://unknown/@unknown"
 
@@ -80,8 +89,10 @@ def extract_body(msg):
 
 def save_envelope(env: Envelope):
     QUEUE_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = env.created_at.isoformat().replace(":", "-")
-    fname = f"{timestamp}-{env.id}.json"
+    timestamp = (
+        env.created_at.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    )
+    fname = f"{timestamp}_{env.id}.json"
     fpath = QUEUE_DIR / fname
     with fpath.open("w", encoding="utf-8") as f:
         f.write(env.to_json(indent=2))
@@ -89,7 +100,7 @@ def save_envelope(env: Envelope):
 
 
 def _require_aiosmtpd() -> None:
-    if not _AIOSMTPD_AVAILABLE:
+    if not HAS_AIOSMTPD:
         raise RuntimeError(
             "aiosmtpd is required to run the LMTP server. Install with 'pip install aiosmtpd'."
         )
@@ -105,7 +116,7 @@ def main():
         decode_data=False,
         enable_SMTPUTF8=True,
         require_starttls=False,
-        server_cls=LMTP,
+        server_class=LMTP,
     )
     controller.start()
     print("AI Agent Hub LMTP Handler running at lmtp://127.0.0.1:8024")
