@@ -1,4 +1,4 @@
-# AI Agent Hub - MTA-based Message Operating System
+# AI Agent Hub - MTA-based Message Hub
 
 ## 概要
 **AI Agent Hub** は、メール（SMTP/LMTP）を高速・信頼性の高いメッセージバスとして利用し、AIエージェントの行動・タスク・イベントを **メッセージ指向で処理するための OS レイヤー** です。
