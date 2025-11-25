@@ -95,8 +95,8 @@ AWS無料枠だと：
 ## ディレクトリ構成
 ```
 ai-agent-os/
-  ├── smtp_sender.py        # Envelope を SMTP 送信
-  ├── lmtp_handler.py       # LMTP受信 → Queue 書き込み
+  ├── ai_agent_hub/smtp_sender.py        # Envelope を SMTP 送信
+  ├── ai_agent_hub/lmtp_handler.py       # LMTP受信 → Queue 書き込み
   ├── queue/                # SQLite or message queue
   ├── worker/               # AI Worker（LLM実行）
   ├── tests/                # E2E pipeline tests
