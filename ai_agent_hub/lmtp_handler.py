@@ -128,4 +128,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as exc:  # pragma: no cover - CLI convenience path
+        print(f"ERROR: {exc}")
+        raise SystemExit(1)
