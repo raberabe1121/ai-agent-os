@@ -9,6 +9,8 @@ from email import message_from_bytes
 from typing import Awaitable, Callable
 
 from ai_agent_hub import Envelope
+# Helper functions migrated from the former aiosmtpd handler:
+# extract_sender, extract_recipient, extract_body, save_envelope
 from ai_agent_hub.lmtp_handler import extract_body, extract_recipient, extract_sender, save_envelope
 
 ResponseWriter = Callable[[str], Awaitable[None]]

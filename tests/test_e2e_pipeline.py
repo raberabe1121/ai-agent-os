@@ -2,12 +2,12 @@
 
 This test exercises the full flow:
 1. Send an envelope via SMTP to Postfix.
-2. Postfix forwards to the LMTP handler, which stores queue JSON.
+2. Postfix forwards to the LMTP server, which stores queue JSON.
 3. Agent worker processes queue items and replies.
 4. Replies are round-tripped back through LMTP and processed.
 
 The test relies on a locally running Postfix instance listening on
-localhost:25 and the LMTP handler being able to start (aiosmtpd required).
+localhost:25 and the asyncio LMTP server being able to start.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import unittest
 
 from ai_agent_hub import Envelope
 from ai_agent_hub.agent_worker import PROCESSED_DIR, process_next_envelope
-from ai_agent_hub.lmtp_handler import HAS_AIOSMTPD, QUEUE_DIR
+from ai_agent_hub.lmtp_handler import QUEUE_DIR
 from ai_agent_hub.smtp_sender import _envelope_to_mime
 
 
@@ -38,11 +38,11 @@ def clean_dirs() -> None:
             directory.mkdir(parents=True, exist_ok=True)
 
 
-def run_lmtp_handler_background() -> subprocess.Popen:
-    """Start the LMTP handler as a background subprocess."""
+def run_lmtp_server_background() -> subprocess.Popen:
+    """Start the asyncio LMTP server as a background subprocess."""
 
     return subprocess.Popen(
-        [sys.executable, "-m", "ai_agent_hub.lmtp_handler"],
+        [sys.executable, "-m", "ai_agent_hub.lmtp_server"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -96,8 +96,6 @@ class TestE2EPipeline(unittest.TestCase):
         clean_dirs()
 
     def _require_environment(self) -> None:
-        if not HAS_AIOSMTPD:
-            self.skipTest("aiosmtpd is required to start the LMTP handler")
         try:
             with smtplib.SMTP("localhost", 25, timeout=1) as smtp:
                 smtp.noop()
@@ -114,9 +112,9 @@ class TestE2EPipeline(unittest.TestCase):
             payload={"intent": "ping"},
         )
 
-        process = run_lmtp_handler_background()
+        process = run_lmtp_server_background()
         try:
-            # Give LMTP handler time to start listening.
+            # Give LMTP server time to start listening.
             time.sleep(0.5)
 
             send_test_envelope_via_smtp(env)
