@@ -29,8 +29,7 @@ class LMTPServer:
     Postfix using ``lmtp:inet:localhost:8024``.
     """
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8024) -> None:
-        self.host = host
+    def __init__(self, port: int = 8024) -> None:
         self.port = port
         self._server: asyncio.AbstractServer | None = None
 
