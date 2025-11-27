@@ -35,7 +35,9 @@ class LMTPServer:
         self._server: asyncio.AbstractServer | None = None
 
     async def start(self) -> None:
-        self._server = await asyncio.start_server(self._handle_client, self.host, self.port)
+        self._server = await asyncio.start_server(
+            self._handle_client, host=None, port=self.port
+        )
         addr = ", ".join(str(sock.getsockname()) for sock in self._server.sockets or [])
         print(f"AI Agent Hub asyncio LMTP server listening on {addr}")
 
