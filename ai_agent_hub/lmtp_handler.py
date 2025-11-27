@@ -6,6 +6,7 @@ exposes helper functions reused by the asyncio LMTP server implementation.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from datetime import timezone
@@ -59,15 +60,29 @@ def _extract_agent_id(raw_header: str | None) -> str:
 
 
 def extract_body(msg) -> str:
-    """Extract the text/plain body from a MIME message."""
+    """Extract body and auto-parse JSON if applicable."""
 
     if msg.is_multipart():
         for part in msg.walk():
             if part.get_content_type() == "text/plain":
-                return part.get_payload(decode=True).decode(errors="replace")
+                raw = part.get_payload(decode=True).decode(errors="replace")
+                return _maybe_json(raw)
         return ""
+
     payload = msg.get_payload(decode=True)
-    return payload.decode(errors="replace") if isinstance(payload, (bytes, bytearray)) else str(payload)
+    text = (
+        payload.decode(errors="replace")
+        if isinstance(payload, (bytes, bytearray))
+        else str(payload)
+    )
+    return _maybe_json(text)
+
+
+def _maybe_json(text: str):
+    try:
+        return json.loads(text)
+    except Exception:
+        return text
 
 
 def save_envelope(env: Envelope):
