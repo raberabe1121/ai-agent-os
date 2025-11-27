@@ -109,18 +109,21 @@ class LMTPServer:
         recipients: list[str],
         write_response: ResponseWriter,
     ) -> None:
+        import traceback
+
         message_id = str(uuid.uuid4())
         raw_bytes = b"".join(data_lines)
+
         try:
-            # Parse MIME body (may or may not include headers)
+            # Parse MIME
             msg = message_from_bytes(raw_bytes)
 
-            # Prefer ActivityPub IDs from MIME headers; fallback to SMTP envelope
-            sender = extract_sender(msg) or mail_from or ""
-            recipient = extract_recipient(msg) or (recipients[0] if recipients else "")
-
-            # Extract payload from body
+            # Extract AP IDs
+            sender = extract_sender(msg)
+            recipient = extract_recipient(msg)
             payload = extract_body(msg)
+
+            # Create envelope
             env = Envelope.new(
                 envelope_type="email",
                 sender=sender,
@@ -128,11 +131,18 @@ class LMTPServer:
                 payload=payload,
                 created_at=datetime.now(timezone.utc),
             )
+
+            # Save to queue
             save_envelope(env)
+
             await write_response(f"250 OK queued as {message_id}")
-        except Exception as exc:  # pragma: no cover - error path
+
+        except Exception as exc:
+            # 🔥 FULL traceback を systemd に流す
+            tb = traceback.format_exc()
+            print("LMTP PROCESSING ERROR:\n", tb, flush=True)
+
             await write_response("451 Requested action aborted: processing error")
-            print(f"Failed to process message: {exc}")
 
 
 def main() -> None:
