@@ -10,8 +10,13 @@ from typing import Awaitable, Callable
 
 from ai_agent_hub import Envelope
 # Helper functions migrated from the former aiosmtpd handler:
-# extract_body, save_envelope
-from ai_agent_hub.lmtp_handler import extract_body, save_envelope
+# extract_sender, extract_recipient, extract_body, save_envelope
+from ai_agent_hub.lmtp_handler import (
+    extract_body,
+    extract_recipient,
+    extract_sender,
+    save_envelope,
+)
 
 ResponseWriter = Callable[[str], Awaitable[None]]
 
@@ -110,9 +115,9 @@ class LMTPServer:
             # Parse MIME body (may or may not include headers)
             msg = message_from_bytes(raw_bytes)
 
-            # Use SMTP envelope addresses, not MIME headers
-            sender = mail_from or ""
-            recipient = recipients[0] if recipients else ""
+            # Prefer ActivityPub IDs from MIME headers; fallback to SMTP envelope
+            sender = extract_sender(msg) or mail_from or ""
+            recipient = extract_recipient(msg) or (recipients[0] if recipients else "")
 
             # Extract payload from body
             payload = extract_body(msg)

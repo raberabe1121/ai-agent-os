@@ -13,8 +13,9 @@ def _envelope_to_mime(env: Envelope) -> EmailMessage:
     """Convert an envelope to a MIME email message."""
 
     msg = EmailMessage()
-    msg["From"] = env.sender
-    msg["To"] = env.recipient
+    # Preserve ActivityPub IDs in headers while supplying email addr-spec for transport
+    msg["From"] = f"{env.sender} <agent@localhost>"
+    msg["To"] = f"{env.recipient} <worker@localhost>"
     msg["Subject"] = f"AI-Agent-Hub: {env.envelope_type}"
     msg["Date"] = format_datetime(env.created_at)
     msg["Message-ID"] = f"<{env.id}@ai-agent-hub>"
@@ -38,8 +39,12 @@ def send_envelope_via_smtp(env: Envelope) -> None:
 
     mime_message = _envelope_to_mime(env)
 
+    # SMTP envelope addresses must be addr-spec, not ActivityPub IDs.
+    smtp_from = "agent@localhost"
+    smtp_to = ["worker@localhost"]
+
     with smtplib.SMTP("localhost", 25) as smtp:
-        smtp.sendmail(env.sender, [env.recipient], mime_message.as_string())
+        smtp.sendmail(smtp_from, smtp_to, mime_message.as_string())
 
 
 __all__ = ["send_envelope_via_smtp", "_envelope_to_mime"]

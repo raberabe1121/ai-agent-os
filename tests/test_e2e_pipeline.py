@@ -23,7 +23,7 @@ import unittest
 from ai_agent_hub import Envelope
 from ai_agent_hub.agent_worker import PROCESSED_DIR, process_next_envelope
 from ai_agent_hub.lmtp_handler import QUEUE_DIR
-from ai_agent_hub.smtp_sender import _envelope_to_mime
+from ai_agent_hub.smtp_sender import send_envelope_via_smtp
 
 
 def clean_dirs() -> None:
@@ -70,9 +70,7 @@ def wait_for_file_in_queue(pattern: str, timeout_sec: float = 5.0) -> Optional[P
 def send_test_envelope_via_smtp(env: Envelope) -> None:
     """Send the provided envelope via SMTP to localhost:25."""
 
-    mime_message = _envelope_to_mime(env)
-    with smtplib.SMTP("localhost", 25, timeout=3) as smtp:
-        smtp.sendmail(env.sender, [env.recipient], mime_message.as_string())
+    send_envelope_via_smtp(env)
 
 
 def assert_response_payload(json_data: dict) -> None:
