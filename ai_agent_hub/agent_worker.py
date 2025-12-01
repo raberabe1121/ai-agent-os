@@ -1,17 +1,30 @@
-"""Agent worker that processes queued envelopes and sends responses."""
+"""Agent worker that processes queued envelopes and dispatches intents."""
 from __future__ import annotations
 
 import json
+import textwrap
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Dict, Optional
 
 from ai_agent_hub import Envelope
 from ai_agent_hub.lmtp_handler import QUEUE_DIR
 from ai_agent_hub.smtp_sender import send_envelope_via_smtp
 
 PROCESSED_DIR = Path("./processed")
-WORKER_AGENT_ID = "https://agent.local/@worker"
+
+
+INTENT_HANDLERS: Dict[str, Callable[[Envelope], Optional[Any]]] = {}
+
+
+def intent_handler(name: str) -> Callable[[Callable[[Envelope], Optional[Any]]], Callable[[Envelope], Optional[Any]]]:
+    """Decorator to register an intent handler."""
+
+    def decorator(func: Callable[[Envelope], Optional[Any]]) -> Callable[[Envelope], Optional[Any]]:
+        INTENT_HANDLERS[name] = func
+        return func
+
+    return decorator
 
 
 def _find_oldest_queue_file() -> Optional[Path]:
@@ -36,32 +49,54 @@ def _extract_intent(env: Envelope) -> Optional[str]:
         intent = payload.get("intent")
         if isinstance(intent, str):
             return intent
-
-        meta = payload.get("meta")
-        if isinstance(meta, dict):
-            meta_intent = meta.get("intent")
-            if isinstance(meta_intent, str):
-                return meta_intent
-
     return None
 
 
-def _summarize_payload(payload: Any) -> str:
-    if isinstance(payload, dict):
-        text_candidate = payload.get("text")
-        if isinstance(text_candidate, str):
-            text = text_candidate
+@intent_handler("ping")
+def _handle_ping(_: Envelope) -> dict:
+    return {"pong": True}
+
+
+@intent_handler("echo")
+def _handle_echo(env: Envelope) -> dict:
+    text = ""
+    if isinstance(env.payload, dict):
+        text_val = env.payload.get("text")
+        if isinstance(text_val, str):
+            text = text_val
         else:
-            text = json.dumps(payload, ensure_ascii=False)
+            text = json.dumps(env.payload, ensure_ascii=False)
     else:
-        text = payload if isinstance(payload, str) else str(payload)
-    return text[:100]
+        text = str(env.payload)
+    return {"echo": text}
+
+
+@intent_handler("help")
+@intent_handler("list-intents")
+def _handle_help(_: Envelope) -> dict:
+    return {"intents": sorted(INTENT_HANDLERS.keys())}
+
+
+@intent_handler("summarize")
+def _handle_summarize(env: Envelope) -> dict:
+    text = ""
+    if isinstance(env.payload, dict):
+        payload_text = env.payload.get("text")
+        if isinstance(payload_text, str):
+            text = payload_text
+        else:
+            text = json.dumps(env.payload, ensure_ascii=False)
+    else:
+        text = str(env.payload)
+
+    summary = textwrap.shorten(text, width=100, placeholder="…")
+    return {"summary": summary}
 
 
 def _build_reply(env: Envelope, result_payload: Any) -> Envelope:
     return Envelope.new(
-        envelope_type="response",
-        sender=WORKER_AGENT_ID,
+        envelope_type="reply",
+        sender=env.recipient,
         recipient=env.sender,
         payload=result_payload,
         context=env.context,
@@ -70,19 +105,27 @@ def _build_reply(env: Envelope, result_payload: Any) -> Envelope:
 
 
 def _handle_envelope(env: Envelope) -> Optional[Envelope]:
-    intent = _extract_intent(env)
-    if not intent:
+    intent_name = _extract_intent(env)
+    if not intent_name:
         print("No intent found; skipping envelope", env.id)
         return None
 
-    if intent == "ping":
-        reply_payload: Any = "pong"
-    elif intent == "echo":
-        reply_payload = env.payload
-    elif intent == "summary":
-        reply_payload = _summarize_payload(env.payload)
+    handler = INTENT_HANDLERS.get(intent_name)
+
+    if handler:
+        print(
+            f"[agent_worker] intent={intent_name} from={env.sender} → handler={handler.__name__}"
+        )
+        try:
+            reply_payload = handler(env)
+        except Exception as exc:  # pragma: no cover - safeguard
+            print(f"Handler error for intent '{intent_name}': {exc}")
+            reply_payload = {"error": str(exc)}
     else:
-        print(f"Unsupported intent '{intent}'; skipping envelope {env.id}")
+        print(f"[agent_worker] intent={intent_name} from={env.sender} → handler=UNKNOWN")
+        reply_payload = {"error": "unknown intent"}
+
+    if reply_payload is None:
         return None
 
     return _build_reply(env, reply_payload)
