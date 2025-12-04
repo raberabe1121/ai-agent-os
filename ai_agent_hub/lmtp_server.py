@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import uuid
 from datetime import datetime, timezone
 from email import message_from_bytes
@@ -17,6 +18,13 @@ from ai_agent_hub.lmtp_handler import (
     extract_sender,
     save_envelope,
 )
+
+LOG_PATH = "/tmp/lmtp_debug.log"
+
+
+def debug(*args: object) -> None:
+    with open(LOG_PATH, "a") as f:
+        print(*args, file=f)
 
 ResponseWriter = Callable[[str], Awaitable[None]]
 
@@ -114,6 +122,12 @@ class LMTPServer:
 
         message_id = str(uuid.uuid4())
         raw_bytes = b"".join(data_lines)
+
+        debug("----- LMTP SERVER DEBUG -----")
+        debug("mail_from =", mail_from)
+        debug("recipients =", recipients)
+        debug("raw_bytes =", raw_bytes)
+        debug("-----------------------------")
 
         try:
             # Parse MIME
