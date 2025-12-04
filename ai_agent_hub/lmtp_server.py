@@ -122,7 +122,32 @@ class LMTPServer:
             # Extract AP IDs
             sender = extract_sender(msg)
             recipient = extract_recipient(msg)
-            payload = extract_body(msg)
+
+            # Extract payload and optional metadata
+            payload_data = extract_body(msg)
+            context = None
+            in_reply_to = None
+            created_at = datetime.now(timezone.utc)
+
+            if isinstance(payload_data, dict):
+                context = payload_data.get("context")
+                in_reply_to = payload_data.get("inReplyTo") or payload_data.get(
+                    "in_reply_to"
+                )
+
+                time_value = payload_data.get("time")
+                if isinstance(time_value, str):
+                    try:
+                        parsed = datetime.fromisoformat(time_value)
+                        if parsed.tzinfo is None:
+                            parsed = parsed.replace(tzinfo=timezone.utc)
+                        created_at = parsed
+                    except ValueError:
+                        created_at = datetime.now(timezone.utc)
+
+                payload = payload_data.get("payload", payload_data)
+            else:
+                payload = payload_data
 
             # Create envelope
             env = Envelope.new(
@@ -130,7 +155,9 @@ class LMTPServer:
                 sender=sender,
                 recipient=recipient,
                 payload=payload,
-                created_at=datetime.now(timezone.utc),
+                context=context,
+                in_reply_to=in_reply_to,
+                created_at=created_at,
             )
 
             # Save to queue
