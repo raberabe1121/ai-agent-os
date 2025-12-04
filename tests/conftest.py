@@ -23,9 +23,9 @@ def queue_dirs(tmp_path, monkeypatch):
     queue_dir.mkdir()
     processed_dir.mkdir()
 
-    monkeypatch.setattr(agent_worker, "QUEUE_DIR", queue_dir)
+    monkeypatch.setattr(agent_worker, "get_queue_dir", lambda: queue_dir)
     monkeypatch.setattr(agent_worker, "PROCESSED_DIR", processed_dir)
-    monkeypatch.setattr(lmtp_handler, "QUEUE_DIR", queue_dir)
+    monkeypatch.setattr(lmtp_handler, "get_queue_dir", lambda: queue_dir)
 
     return queue_dir, processed_dir
 

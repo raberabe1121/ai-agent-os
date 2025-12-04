@@ -23,14 +23,14 @@ import unittest
 
 from ai_agent_hub import Envelope
 from ai_agent_hub.agent_worker import PROCESSED_DIR, process_next_envelope
-from ai_agent_hub.lmtp_handler import QUEUE_DIR
+from ai_agent_hub.lmtp_handler import get_queue_dir
 from ai_agent_hub.smtp_sender import send_envelope_via_smtp
 
 
 def clean_dirs() -> None:
     """Remove all files inside queue and processed directories."""
 
-    for directory in (QUEUE_DIR, PROCESSED_DIR):
+    for directory in (get_queue_dir(), PROCESSED_DIR):
         if directory.exists():
             for path in directory.iterdir():
                 if path.is_file():
@@ -44,7 +44,7 @@ def run_lmtp_server_background() -> subprocess.Popen:
 
     env = os.environ.copy()
     # pytest が monkeypatch した QUEUE_DIR を子プロセスに伝搬
-    env["AI_AGENT_HUB_QUEUE_DIR"] = str(QUEUE_DIR)
+    env["AI_AGENT_HUB_QUEUE_DIR"] = str(get_queue_dir())
 
     return subprocess.Popen(
         [sys.executable, "-m", "ai_agent_hub.lmtp_server"],
@@ -65,7 +65,7 @@ def wait_for_file_in_queue(pattern: str, timeout_sec: float = 5.0) -> Optional[P
 
     deadline = time.monotonic() + timeout_sec
     while time.monotonic() < deadline:
-        matches = list(QUEUE_DIR.glob(pattern))
+        matches = list(get_queue_dir().glob(pattern))
         if matches:
             return matches[0]
         time.sleep(0.1)

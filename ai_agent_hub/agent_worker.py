@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from ai_agent_hub import Envelope
-from ai_agent_hub.lmtp_handler import QUEUE_DIR
+from ai_agent_hub.lmtp_handler import get_queue_dir
 from ai_agent_hub.smtp_sender import send_envelope_via_smtp
 
 PROCESSED_DIR = Path(
@@ -33,10 +33,11 @@ def intent_handler(name: str) -> Callable[[Callable[[Envelope], Optional[Any]]],
 
 
 def _find_oldest_queue_file() -> Optional[Path]:
-    if not QUEUE_DIR.exists():
+    queue_dir = get_queue_dir()
+    if not queue_dir.exists():
         return None
 
-    files = [p for p in QUEUE_DIR.iterdir() if p.is_file()]
+    files = [p for p in queue_dir.iterdir() if p.is_file()]
     if not files:
         return None
 

@@ -14,24 +14,27 @@ from pathlib import Path
 
 from ai_agent_hub import Envelope
 
-# Support both legacy and shorthand environment variable names for the queue
-# directory so deployments exporting either value continue to work.
-QUEUE_DIR = Path(
-    os.environ.get("AI_AGENT_HUB_QUEUE_DIR")
-    or os.environ.get("AGENT_HUB_QUEUE_DIR")
-    or "./queue"
-)
-
 
 # ActivityPub Agent ID pattern: https://domain/@name
 _AGENT_ID_PATTERN = re.compile(r"(https?://[a-zA-Z0-9.\-]+/@[a-zA-Z0-9_.\-]+)")
 
 __all__ = [
+    "get_queue_dir",
     "extract_sender",
     "extract_recipient",
     "extract_body",
     "save_envelope",
 ]
+
+
+def get_queue_dir() -> Path:
+    """Return the queue directory, evaluating environment variables at call time."""
+
+    return Path(
+        os.environ.get("AI_AGENT_HUB_QUEUE_DIR")
+        or os.environ.get("AGENT_HUB_QUEUE_DIR")
+        or "./queue"
+    )
 
 
 def extract_sender(msg) -> str:
@@ -94,10 +97,11 @@ def _maybe_json(text: str):
 def save_envelope(env: Envelope):
     """Persist an envelope to the queue directory using an OS-safe filename."""
 
-    QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    queue_dir = get_queue_dir()
+    queue_dir.mkdir(parents=True, exist_ok=True)
     timestamp = env.created_at.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     fname = f"{timestamp}_{env.id}.json"
-    fpath = QUEUE_DIR / fname
+    fpath = queue_dir / fname
     with fpath.open("w", encoding="utf-8") as f:
         f.write(env.to_json(indent=2))
     print(f"Saved envelope → {fpath}")
