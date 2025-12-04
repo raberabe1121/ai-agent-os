@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import textwrap
 import time
 from pathlib import Path
@@ -11,7 +12,11 @@ from ai_agent_hub import Envelope
 from ai_agent_hub.lmtp_handler import QUEUE_DIR
 from ai_agent_hub.smtp_sender import send_envelope_via_smtp
 
-PROCESSED_DIR = Path("./processed")
+PROCESSED_DIR = Path(
+    os.environ.get("AI_AGENT_HUB_PROCESSED_DIR")
+    or os.environ.get("AGENT_HUB_PROCESSED_DIR")
+    or "./processed"
+)
 
 
 INTENT_HANDLERS: Dict[str, Callable[[Envelope], Optional[Any]]] = {}

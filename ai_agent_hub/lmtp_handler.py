@@ -14,7 +14,13 @@ from pathlib import Path
 
 from ai_agent_hub import Envelope
 
-QUEUE_DIR = Path(os.environ.get("AI_AGENT_HUB_QUEUE_DIR", "./queue"))
+# Support both legacy and shorthand environment variable names for the queue
+# directory so deployments exporting either value continue to work.
+QUEUE_DIR = Path(
+    os.environ.get("AI_AGENT_HUB_QUEUE_DIR")
+    or os.environ.get("AGENT_HUB_QUEUE_DIR")
+    or "./queue"
+)
 
 
 # ActivityPub Agent ID pattern: https://domain/@name
