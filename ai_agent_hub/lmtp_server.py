@@ -19,12 +19,12 @@ from ai_agent_hub.lmtp_handler import (
     save_envelope,
 )
 
-LOG_PATH = "/tmp/lmtp_debug.log"
+DEBUG_LOG = "/tmp/lmtp_debug.log"
 
 
 def debug(*args: object) -> None:
-    with open(LOG_PATH, "a") as f:
-        print(*args, file=f)
+    with open(DEBUG_LOG, "a") as f:
+        print(*args, file=f, flush=True)
 
 ResponseWriter = Callable[[str], Awaitable[None]]
 
@@ -118,16 +118,13 @@ class LMTPServer:
         recipients: list[str],
         write_response: ResponseWriter,
     ) -> None:
-        import traceback
-
         message_id = str(uuid.uuid4())
         raw_bytes = b"".join(data_lines)
 
-        debug("----- LMTP SERVER DEBUG -----")
+        debug("----- PROCESS MESSAGE -----")
+        debug("raw_bytes =", data_lines)
         debug("mail_from =", mail_from)
         debug("recipients =", recipients)
-        debug("raw_bytes =", raw_bytes)
-        debug("-----------------------------")
 
         try:
             # Parse MIME
@@ -177,12 +174,17 @@ class LMTPServer:
             # Save to queue
             save_envelope(env)
 
+            debug("SAVED ENVELOPE:", env.id)
+            debug("QUEUE PATH:", env.sender, env.recipient)
+
             await write_response(f"250 OK queued as {message_id}")
 
         except Exception as exc:
             # 🔥 FULL traceback を systemd に流す
+            import traceback
+
             tb = traceback.format_exc()
-            print("LMTP PROCESSING ERROR:\n", tb, flush=True)
+            debug("ERROR in LMTP processing:", tb)
 
             await write_response("451 Requested action aborted: processing error")
 
