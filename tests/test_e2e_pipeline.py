@@ -12,6 +12,7 @@ localhost:25 and the asyncio LMTP server being able to start.
 from __future__ import annotations
 
 import json
+import os
 import smtplib
 import subprocess
 import sys
@@ -41,11 +42,15 @@ def clean_dirs() -> None:
 def run_lmtp_server_background() -> subprocess.Popen:
     """Start the asyncio LMTP server as a background subprocess."""
 
+    env = os.environ.copy()
+    # pytest が monkeypatch した QUEUE_DIR を子プロセスに伝搬
+    env["AI_AGENT_HUB_QUEUE_DIR"] = str(QUEUE_DIR)
+
     return subprocess.Popen(
         [sys.executable, "-m", "ai_agent_hub.lmtp_server"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
+        env=env,
     )
 
 
