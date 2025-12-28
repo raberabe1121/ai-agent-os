@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import smtplib
 import subprocess
 import sys
@@ -20,6 +21,8 @@ import time
 from pathlib import Path
 from typing import Optional
 import unittest
+
+import pytest
 
 from ai_agent_hub import Envelope
 from ai_agent_hub.agent_worker import PROCESSED_DIR, process_next_envelope
@@ -42,16 +45,32 @@ def clean_dirs() -> None:
 def run_lmtp_server_background() -> subprocess.Popen:
     """Start the asyncio LMTP server as a background subprocess."""
 
-    env = os.environ.copy()
-    # pytest が monkeypatch した QUEUE_DIR を子プロセスに伝搬
-    env["AI_AGENT_HUB_QUEUE_DIR"] = str(get_queue_dir())
+    env = {
+        **os.environ,
+        "AI_AGENT_HUB_QUEUE_DIR": str(get_queue_dir()),
+        "PYTHONPATH": str(Path(__file__).parent.parent),
+    }
 
-    return subprocess.Popen(
+    process = subprocess.Popen(
         [sys.executable, "-m", "ai_agent_hub.lmtp_server"],
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         env=env,
     )
+    for _ in range(50):
+        time.sleep(0.1)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            result = sock.connect_ex(("127.0.0.1", 8024))
+        if result == 0:
+            break
+    else:
+        debug_log = Path("/tmp/lmtp_debug.log")
+        if debug_log.exists():
+            print("=== LMTP DEBUG LOG ===")
+            print(debug_log.read_text(encoding="utf-8"))
+        pytest.fail("LMTP server failed to start")
+
+    return process
 
 
 def run_agent_worker_once() -> bool:

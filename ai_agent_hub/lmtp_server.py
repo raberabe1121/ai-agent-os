@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -43,10 +44,18 @@ class LMTPServer:
 
     async def start(self) -> None:
         self._server = await asyncio.start_server(
-            self._handle_client, host=None, port=self.port
+            self._handle_client,
+            host="127.0.0.1",
+            port=self.port,
+            reuse_address=True,
         )
-        addr = ", ".join(str(sock.getsockname()) for sock in self._server.sockets or [])
+        addr = self._server.sockets[0].getsockname() if self._server.sockets else "unknown"
+        debug(f"✅ LMTP server bound to {addr}")
         print(f"AI Agent Hub asyncio LMTP server listening on {addr}")
+        print(
+            f"LMTP server startup OK. Listening on 127.0.0.1:{self.port}",
+            flush=True,
+        )
 
     async def serve_forever(self) -> None:
         if self._server is None:
@@ -72,7 +81,7 @@ class LMTPServer:
             if raw_line == b"":
                 break
             if in_data_mode:
-                if raw_line in {b".\r\n", b".\n", b"."}:
+                if raw_line.rstrip() == b".":
                     await self._process_message(data_lines, mail_from, recipients, write_response)
                     in_data_mode = False
                     data_lines = []
@@ -190,8 +199,22 @@ class LMTPServer:
 
 
 def main() -> None:
-    server = LMTPServer()
-    asyncio.run(server.serve_forever())
+    debug("=== LMTP SERVER STARTING ===")
+    debug("Python:", sys.version)
+    debug("CWD:", os.getcwd())
+    debug("PYTHONPATH:", sys.path)
+    debug("QUEUE_DIR env:", os.environ.get("AI_AGENT_HUB_QUEUE_DIR"))
+
+    try:
+        server = LMTPServer()
+        debug("LMTPServer instance created")
+        asyncio.run(server.serve_forever())
+    except Exception as exc:
+        debug("FATAL ERROR:", exc)
+        import traceback
+
+        debug(traceback.format_exc())
+        sys.exit(1)
 
 
 if __name__ == "__main__":
